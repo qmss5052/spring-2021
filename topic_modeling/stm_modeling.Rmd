@@ -1,0 +1,408 @@
+---
+title: "CFPB Topic Modeling"
+output: html_notebook
+---
+
+```{r Data Preprocessing, echo=FALSE}
+raw_data <- read.csv("data/narratives_raw.csv")
+# data <- read.csv("data/narratives_ngram_stringed.csv")
+
+# meta_cols <- c("Product",
+#                "Sub.product",
+#                 "Issue",
+#                 "Sub.issue",
+#                 "Company",
+#                 "State",
+#                 "Company.response.to.consumer",
+#                 "Timely.response.",
+#                 "Consumer.disputed.",
+#                 "Complaint.length")
+# 
+# data[meta_cols] <- lapply(data[meta_cols], factor)
+# data$Date.received <- as.POSIXct(data$Date.received)
+# meta_cols <- append(meta_cols, 'Date.received')
+
+
+# processed <- textProcessor(data$Consumer.complaint.narrative,
+#                            metadata=data[meta_cols],
+#                            lowercase=FALSE,
+#                            removestopwords=FALSE,
+#                            removenumbers=FALSE,
+#                            removepunctuation=FALSE,
+#                            stem=FALSE,
+#                            language="na")
+# 
+# out <- prepDocuments(processed$documents,
+#                      processed$vocab,
+#                      meta=processed$meta,
+#                      lower.thresh=350,
+#                      upper.thresh=600000)
+# 
+# docs <- out$documents
+# vocab <- out$vocab
+# meta <-out$meta
+```
+```{r Evaluating 10-15-20 Topics, echo=FALSE}
+no_topic_eval <- searchK(docs,
+                         vocab,
+                         K=c(10,15,20),
+                         init.type = "Spectral",
+                         N=floor(0.1*length(docs)),
+                         proportion=0.5,
+                         heldout.seed=123,
+                         cores=1
+                         )
+```
+```{r Visualising 10-15-20 Topics}
+plot(no_topic_eval)
+```
+```{r Comparing Semantic Coherence and Exclusivity}
+ggplot(no_topic_eval$results, aes(x=as.numeric(exclus), 
+                                  y=as.numeric(semcoh), 
+                                  color=K))+
+  geom_point()+
+  theme_bw()
+```
+```{r Model Training 10 Topics, echo=FALSE}
+stm_fit_10 <- stm(docs,
+               K=10,
+               vocab=vocab,
+               data=meta,
+               init.type = "Spectral",
+               max.em.its = 100
+               )
+```
+```{r Model Training 11 Topics, echo=FALSE}
+stm_fit_11 <- stm(docs,
+               K=11,
+               vocab=vocab,
+               data=meta,
+               init.type = "Spectral",
+               max.em.its = 100
+               )
+```
+```{r Model Training 12 Topics, echo=FALSE}
+stm_fit_12 <- stm(docs,
+               K=12,
+               vocab=vocab,
+               data=meta,
+               init.type = "Spectral",
+               max.em.its = 100
+               )
+```
+```{r Model Training 13 Topics, echo=FALSE}
+stm_fit_13 <- stm(docs,
+               K=13,
+               vocab=vocab,
+               data=meta,
+               init.type = "Spectral",
+               max.em.its = 100
+               )
+```
+```{r Model Training 14 Topics, echo=FALSE}
+stm_fit_14 <- stm(docs,
+               K=14,
+               vocab=vocab,
+               data=meta,
+               init.type = "Spectral",
+               max.em.its = 100
+               )
+```
+```{r Model Training 15 Topics, echo=FALSE}
+stm_fit_15 <- stm(docs,
+               K=15,
+               vocab=vocab,
+               data=meta,
+               init.type = "Spectral",
+               max.em.its = 100
+               )
+```
+```{r Model Training 16 Topics, echo=FALSE}
+stm_fit_16 <- stm(docs,
+               K=16,
+               vocab=vocab,
+               data=meta,
+               init.type = "Spectral",
+               max.em.its = 100
+               )
+```
+```{r Evaluating Semantic Coherence of 10-16 Topics}
+suppressWarnings(library(ggplot2))
+suppressWarnings(library(plotly))
+
+M10ExSem<-as.data.frame(cbind(c(1:10),exclusivity(stm_fit_10), semanticCoherence(model=stm_fit_10, docs), "Mod10"))
+M11ExSem<-as.data.frame(cbind(c(1:11),exclusivity(stm_fit_11), semanticCoherence(model=stm_fit_11, docs), "Mod11"))
+M12ExSem<-as.data.frame(cbind(c(1:12),exclusivity(stm_fit_12), semanticCoherence(model=stm_fit_12, docs), "Mod12"))
+M13ExSem<-as.data.frame(cbind(c(1:13),exclusivity(stm_fit_13), semanticCoherence(model=stm_fit_13, docs), "Mod13"))
+M14ExSem<-as.data.frame(cbind(c(1:14),exclusivity(stm_fit_14), semanticCoherence(model=stm_fit_14, docs), "Mod14"))
+M15ExSem<-as.data.frame(cbind(c(1:15),exclusivity(stm_fit_15), semanticCoherence(model=stm_fit_15, docs), "Mod15"))
+M16ExSem<-as.data.frame(cbind(c(1:16),exclusivity(stm_fit_16), semanticCoherence(model=stm_fit_16, docs), "Mod16"))
+
+ModsExSem<-rbind(M10ExSem, M11ExSem, M12ExSem, M13ExSem, M14ExSem, M15ExSem, M16ExSem)
+colnames(ModsExSem)<-c("K","Exclusivity", "SemanticCoherence", "Model")
+
+ModsExSem$Exclusivity<-as.numeric(as.character(ModsExSem$Exclusivity))
+ModsExSem$SemanticCoherence<-as.numeric(as.character(ModsExSem$SemanticCoherence))
+
+options(repr.plot.width=3, repr.plot.height=3, repr.plot.res=100)
+
+plotexcoer<-ggplot(ModsExSem, aes(SemanticCoherence, Exclusivity, color = Model))+geom_point(size = 2, alpha = 0.7) + 
+geom_text(aes(label=K), nudge_x=.05, nudge_y=.05)+
+  labs(x = "Semantic coherence",
+       y = "Exclusivity",
+       title = "Comparing exclusivity and semantic coherence")
+
+plotexcoer
+```
+```{r}
+ModsExSem<-rbind(M10ExSem, M11ExSem)
+colnames(ModsExSem)<-c("K","Exclusivity", "SemanticCoherence", "Model")
+
+ModsExSem$Exclusivity<-as.numeric(as.character(ModsExSem$Exclusivity))
+ModsExSem$SemanticCoherence<-as.numeric(as.character(ModsExSem$SemanticCoherence))
+
+options(repr.plot.width=3, repr.plot.height=3, repr.plot.res=100)
+
+plotexcoer<-ggplot(ModsExSem, aes(SemanticCoherence, Exclusivity, color = Model))+geom_point(size = 2, alpha = 0.7) + 
+geom_text(aes(label=K), nudge_x=.05, nudge_y=.05)+
+  labs(x = "Semantic coherence",
+       y = "Exclusivity",
+       title = "Comparing exclusivity and semantic coherence")
+
+plotexcoer
+```
+```{r}
+ModsExSem<-rbind(M11ExSem, M12ExSem)
+colnames(ModsExSem)<-c("K","Exclusivity", "SemanticCoherence", "Model")
+
+ModsExSem$Exclusivity<-as.numeric(as.character(ModsExSem$Exclusivity))
+ModsExSem$SemanticCoherence<-as.numeric(as.character(ModsExSem$SemanticCoherence))
+
+options(repr.plot.width=3, repr.plot.height=3, repr.plot.res=100)
+
+plotexcoer<-ggplot(ModsExSem, aes(SemanticCoherence, Exclusivity, color = Model))+geom_point(size = 2, alpha = 0.7) + 
+geom_text(aes(label=K), nudge_x=.05, nudge_y=.05)+
+  labs(x = "Semantic coherence",
+       y = "Exclusivity",
+       title = "Comparing exclusivity and semantic coherence")
+
+plotexcoer
+```
+```{r}
+ModsExSem<-rbind(M12ExSem, M13ExSem)
+colnames(ModsExSem)<-c("K","Exclusivity", "SemanticCoherence", "Model")
+
+ModsExSem$Exclusivity<-as.numeric(as.character(ModsExSem$Exclusivity))
+ModsExSem$SemanticCoherence<-as.numeric(as.character(ModsExSem$SemanticCoherence))
+
+options(repr.plot.width=3, repr.plot.height=3, repr.plot.res=100)
+
+plotexcoer<-ggplot(ModsExSem, aes(SemanticCoherence, Exclusivity, color = Model))+geom_point(size = 2, alpha = 0.7) + 
+geom_text(aes(label=K), nudge_x=.05, nudge_y=.05)+
+  labs(x = "Semantic coherence",
+       y = "Exclusivity",
+       title = "Comparing exclusivity and semantic coherence")
+
+plotexcoer
+```
+```{r}
+ModsExSem<-rbind(M13ExSem, M14ExSem)
+colnames(ModsExSem)<-c("K","Exclusivity", "SemanticCoherence", "Model")
+
+ModsExSem$Exclusivity<-as.numeric(as.character(ModsExSem$Exclusivity))
+ModsExSem$SemanticCoherence<-as.numeric(as.character(ModsExSem$SemanticCoherence))
+
+options(repr.plot.width=3, repr.plot.height=3, repr.plot.res=100)
+
+plotexcoer<-ggplot(ModsExSem, aes(SemanticCoherence, Exclusivity, color = Model))+geom_point(size = 2, alpha = 0.7) + 
+geom_text(aes(label=K), nudge_x=.05, nudge_y=.05)+
+  labs(x = "Semantic coherence",
+       y = "Exclusivity",
+       title = "Comparing exclusivity and semantic coherence")
+
+plotexcoer
+```
+```{r}
+ModsExSem<-rbind(M14ExSem, M15ExSem)
+colnames(ModsExSem)<-c("K","Exclusivity", "SemanticCoherence", "Model")
+
+ModsExSem$Exclusivity<-as.numeric(as.character(ModsExSem$Exclusivity))
+ModsExSem$SemanticCoherence<-as.numeric(as.character(ModsExSem$SemanticCoherence))
+
+options(repr.plot.width=3, repr.plot.height=3, repr.plot.res=100)
+
+plotexcoer<-ggplot(ModsExSem, aes(SemanticCoherence, Exclusivity, color = Model))+geom_point(size = 2, alpha = 0.7) + 
+geom_text(aes(label=K), nudge_x=.05, nudge_y=.05)+
+  labs(x = "Semantic coherence",
+       y = "Exclusivity",
+       title = "Comparing exclusivity and semantic coherence")
+
+plotexcoer
+```
+```{r}
+ModsExSem<-rbind(M15ExSem, M16ExSem)
+colnames(ModsExSem)<-c("K","Exclusivity", "SemanticCoherence", "Model")
+
+ModsExSem$Exclusivity<-as.numeric(as.character(ModsExSem$Exclusivity))
+ModsExSem$SemanticCoherence<-as.numeric(as.character(ModsExSem$SemanticCoherence))
+
+options(repr.plot.width=3, repr.plot.height=3, repr.plot.res=100)
+
+plotexcoer<-ggplot(ModsExSem, aes(SemanticCoherence, Exclusivity, color = Model))+geom_point(size = 2, alpha = 0.7) + 
+geom_text(aes(label=K), nudge_x=.05, nudge_y=.05)+
+  labs(x = "Semantic coherence",
+       y = "Exclusivity",
+       title = "Comparing exclusivity and semantic coherence")
+
+plotexcoer
+```
+```{r 15 Topic Keywords}
+labelTopics(stm_fit_15, n=15)
+```
+```{r Preparing Example Narratives, echo=FALSE}
+# z <- raw_data$Consumer.complaint.narrative[-out$docs.removed]
+# z <- z[-processed$docs.removed]
+eg_narr <- findThoughts(stm_fit_15,
+                        texts=z,
+                        n=100,
+                        )
+```
+```{r Topic 1 Example Narratives}
+plotQuote(eval(eg_narr$docs[[1]][1:5]), 
+          text.cex=0.5, 
+          width=120,
+          maxwidth=600,
+          main="Topic 1: Credit Report Inaccuracies"
+          )
+```
+```{r Topic 2 Example Narratives}
+plotQuote(eval(eg_narr$docs[[2]][1:5]), 
+          text.cex=0.38, 
+          width=160,
+          maxwidth=1000,
+          main="Topic 2: Unauthorised/Inaccurate Accounts (link to topic 4)"
+          )
+```
+```{r Topic 3 Example Narratives}
+plotQuote(eval(eg_narr$docs[[3]][1:5]), 
+          text.cex=0.5, 
+          width=130,
+          maxwidth=1000,
+          main="Topic 3: Debt Financing Issues, Wage Garnishment"
+          )
+```
+```{r Topic 4 Example Narratives}
+plotQuote(eval(eg_narr$docs[[4]][1:5]), 
+          text.cex=0.42, 
+          width=140,
+          maxwidth=1000,
+          main="Topic 4: Identity Theft (link to topic 2)"
+          )
+```
+```{r Topic 5 Example Narratives}
+plotQuote(eval(eg_narr$docs[[5]][1:4]), 
+          text.cex=0.45, 
+          width=145,
+          maxwidth=1000,
+          main="Topic 5: Unauthorised Credit Inquiries"
+          )
+```
+```{r Topic 6 Example Narratives}
+plotQuote(eval(eg_narr$docs[[6]][1:5]), 
+          text.cex=0.42, 
+          width=140,
+          maxwidth=1000,
+          main="Topic 6: Loans"
+          )
+```
+```{r Topic 7 Example Narratives}
+plotQuote(eval(eg_narr$docs[[7]][6:11]), 
+          text.cex=0.4, 
+          width=140,
+          maxwidth=1000,
+          main="Topic 7: Lawsuits"
+          )
+```
+```{r Topic 8 Example Narratives}
+plotQuote(eval(eg_narr$docs[[8]][c(1:5)]), 
+          text.cex=0.4, 
+          width=160,
+          maxwidth=1000,
+          main="Topic 8: Late Payments"
+          )
+```
+```{r Topic 9 Example Narratives}
+plotQuote(eval(eg_narr$docs[[9]][1:5]), 
+          text.cex=0.4, 
+          width=160,
+          maxwidth=1000,
+          main="Topic 9: Company Response Time"
+          )
+```
+```{r Topic 10 Example Narratives}
+plotQuote(eval(eg_narr$docs[[10]][1:5]), 
+          text.cex=0.43, 
+          width=150,
+          maxwidth=1000,
+          main="Topic 10: Credit Card Promotions/Offers"
+          )
+```
+```{r Topic 11 Example Narratives}
+plotQuote(eval(eg_narr$docs[[11]][3:9]), 
+          text.cex=0.44, 
+          width=160,
+          maxwidth=1000,
+          main="Topic 11: Bank Account Mismanagement: Deposits and Checks"
+          )
+```
+```{r Topic 12 Example Narratives}
+plotQuote(eval(eg_narr$docs[[12]][1:5]), 
+          text.cex=0.4, 
+          width=120,
+          maxwidth=1000,
+          main="Topic 12: Harassment, Robo-calls"
+          )
+```
+```{r Topic 13 Example Narratives}
+plotQuote(eval(eg_narr$docs[[13]][1:3]), 
+          text.cex=0.44, 
+          width=160,
+          maxwidth=1000,
+          main="Topic 13: ???"
+          )
+```
+```{r Topic 14 Example Narratives}
+plotQuote(eval(eg_narr$docs[[14]][1:3]), 
+          text.cex=0.44, 
+          width=160,
+          maxwidth=1000,
+          main="Topic 14: ???"
+          )
+```
+```{r Topic 15 Example Narratives}
+plotQuote(eval(eg_narr$docs[[15]][1:5]), 
+          text.cex=0.42, 
+          width=145,
+          maxwidth=1000,
+          main="Topic 15: Disputing Company Responses/Follow-up Actions"
+          )
+```
+```{r Topic Proportions}
+topic_names = c("Credit Report Inaccuracies", 
+                "Unauthorised/Inaccurate Accounts",
+                "Debt Financing Issues, Wage Garnishment",
+                "Identity Theft",
+                "Unauthorised Credit Inquiries",
+                "Loans",
+                "Lawsuits",
+                "Late Payments",
+                "Company Response Time",
+                "Credit Card Promotions/Offers",
+                "Bank Account Mismanagement: Deposits and Checks",
+                "Harassment, Robo-calls",
+                "???",
+                "???",
+                "Disputing Company Responses/Follow-up Actions"
+                )
+plot(stm_fit_15, type="summary", custom.labels=topic_names)
+```
